@@ -1,0 +1,46 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Kullanıcı koleksiyonu kuralları
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update: if request.auth != null && request.auth.uid == userId;
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Araç koleksiyonu kuralları
+    match /vehicles/{vehicleId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'firma_yetkilisi';
+    }
+    
+    // Bakım kayıtları koleksiyonu kuralları
+    match /maintenance_records/{recordId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'firma_yetkilisi' ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'dis_kaynak_personeli'
+      );
+    }
+    
+    // Yakıt kayıtları koleksiyonu kuralları
+    match /fuel_records/{recordId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'firma_yetkilisi' ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'surucu'
+      );
+    }
+    
+    // Kilometre kayıtları koleksiyonu kuralları
+    match /mileage_records/{recordId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'firma_yetkilisi' ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'surucu'
+      );
+    }
+  }
+} 
