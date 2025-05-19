@@ -1,10 +1,12 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, signInWithEmailAndPassword, signOut as firebaseSignOut } from 'firebase/auth';
+import { User as FirebaseUser, signInWithEmailAndPassword, signOut as firebaseSignOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase/config';
 import Cookies from 'js-cookie';
 import { useRouter } from 'next/navigation';
+import { User } from '@/types';
+import { UserService } from '@/lib/firebase/services';
 
 interface AuthContextType {
   user: User | null;
@@ -28,19 +30,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-      setUser(user);
-      setLoading(false);
-      
-      if (user) {
-        // Kullanıcı oturum açtığında token'ı cookie'ye kaydet
-        user.getIdToken().then((token) => {
-          Cookies.set('auth-token', token, { expires: 7 }); // 7 gün geçerli
-        });
+    const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
+      if (firebaseUser) {
+        // Firebase kullanıcısından bizim User tipimize dönüştür
+        const userData = await UserService.get(firebaseUser.uid);
+        setUser(userData);
+        
+        // Token'ı cookie'ye kaydet
+        const token = await firebaseUser.getIdToken();
+        Cookies.set('auth-token', token, { expires: 7 }); // 7 gün geçerli
       } else {
-        // Kullanıcı oturumu kapattığında cookie'yi sil
+        setUser(null);
         Cookies.remove('auth-token');
       }
+      setLoading(false);
     });
 
     return () => unsubscribe();
@@ -49,7 +52,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string) => {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      setUser(userCredential.user);
+      const userData = await UserService.get(userCredential.user.uid);
+      setUser(userData);
       router.push('/dashboard');
     } catch (error: any) {
       throw new Error(error.message);
