@@ -1,24 +1,30 @@
 'use client';
 
-import React, { Suspense } from 'react';
+import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { Form, Input, Button, Card, message } from 'antd';
+import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { useAuth } from '@/contexts/AuthContext';
-import { Button, Card, Form, Input, message } from 'antd';
 import Link from 'next/link';
 
 function LoginForm() {
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login } = useAuth();
-  const [form] = Form.useForm();
 
-  const handleSubmit = async (values: { email: string; password: string }) => {
+  const onFinish = async (values: { email: string; password: string }) => {
     try {
+      setLoading(true);
       await login(values.email, values.password);
+      message.success('Giriş başarılı!');
       const redirectTo = searchParams.get('redirectTo') || '/dashboard';
       router.push(redirectTo);
-    } catch (error: any) {
-      message.error(error.message || 'Giriş yapılırken bir hata oluştu');
+    } catch (error) {
+      console.error('Login error:', error);
+      message.error('Giriş başarısız. Lütfen bilgilerinizi kontrol edin.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -27,40 +33,50 @@ function LoginForm() {
       <Card className="max-w-md w-full space-y-8">
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Hesabınıza giriş yapın
+            Filo Yönetim Sistemi
           </h2>
+          <p className="mt-2 text-center text-sm text-gray-600">
+            Hesabınıza giriş yapın
+          </p>
         </div>
         <Form
-          form={form}
           name="login"
-          onFinish={handleSubmit}
+          initialValues={{ remember: true }}
+          onFinish={onFinish}
           layout="vertical"
-          requiredMark={false}
+          size="large"
         >
           <Form.Item
             name="email"
             rules={[
-              { required: true, message: 'Lütfen e-posta adresinizi girin' },
-              { type: 'email', message: 'Geçerli bir e-posta adresi girin' }
+              { required: true, message: 'Lütfen e-posta adresinizi girin!' },
+              { type: 'email', message: 'Geçerli bir e-posta adresi girin!' }
             ]}
           >
-            <Input size="large" placeholder="E-posta" />
+            <Input
+              prefix={<UserOutlined />}
+              placeholder="E-posta"
+              autoComplete="email"
+            />
           </Form.Item>
 
           <Form.Item
             name="password"
-            rules={[{ required: true, message: 'Lütfen şifrenizi girin' }]}
+            rules={[{ required: true, message: 'Lütfen şifrenizi girin!' }]}
           >
-            <Input.Password size="large" placeholder="Şifre" />
+            <Input.Password
+              prefix={<LockOutlined />}
+              placeholder="Şifre"
+              autoComplete="current-password"
+            />
           </Form.Item>
 
           <Form.Item>
             <Button
               type="primary"
               htmlType="submit"
-              size="large"
-              block
-              className="bg-blue-600 hover:bg-blue-700 text-white border-none shadow-sm"
+              loading={loading}
+              className="w-full"
             >
               Giriş Yap
             </Button>
