@@ -1,71 +1,74 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User as FirebaseUser } from 'firebase/auth';
-import { auth } from '../lib/firebase/config';
-import { onAuthStateChanged } from 'firebase/auth';
-import { getDocument } from '../lib/firebase/services';
-import { User } from '../types';
+import { User, signInWithEmailAndPassword, signOut as firebaseSignOut } from 'firebase/auth';
+import { auth } from '@/lib/firebase/config';
 import Cookies from 'js-cookie';
+import { useRouter } from 'next/navigation';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
+  login: (email: string, password: string) => Promise<void>;
+  signOut: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  loading: true,
+  login: async () => {},
+  signOut: async () => {},
+});
+
+export const useAuth = () => useContext(AuthContext);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      try {
-        if (firebaseUser) {
-          // Firebase token'ını al
-          const token = await firebaseUser.getIdToken();
-          
-          // Token'ı cookie'ye kaydet
-          Cookies.set('session', token, { expires: 7 }); // 7 gün geçerli
-
-          // Firestore'dan kullanıcı bilgilerini al
-          const userDoc = await getDocument<User>('users', firebaseUser.uid);
-          if (!userDoc) {
-            throw new Error('Kullanıcı bilgileri bulunamadı');
-          }
-          
-          console.log('Kullanıcı bilgileri yüklendi:', userDoc);
-          setUser(userDoc);
-        } else {
-          // Kullanıcı çıkış yaptığında cookie'yi sil
-          Cookies.remove('session');
-          setUser(null);
-        }
-      } catch (error) {
-        console.error('Auth state değişikliği hatası:', error);
-        // Hata durumunda cookie'yi sil ve kullanıcıyı çıkış yapmış say
-        Cookies.remove('session');
-        setUser(null);
-      } finally {
-        setLoading(false);
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      setUser(user);
+      setLoading(false);
+      
+      if (user) {
+        // Kullanıcı oturum açtığında token'ı cookie'ye kaydet
+        user.getIdToken().then((token) => {
+          Cookies.set('auth-token', token, { expires: 7 }); // 7 gün geçerli
+        });
+      } else {
+        // Kullanıcı oturumu kapattığında cookie'yi sil
+        Cookies.remove('auth-token');
       }
     });
 
     return () => unsubscribe();
   }, []);
 
+  const login = async (email: string, password: string) => {
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      setUser(userCredential.user);
+      router.push('/dashboard');
+    } catch (error: any) {
+      throw new Error(error.message);
+    }
+  };
+
+  const signOut = async () => {
+    try {
+      await firebaseSignOut(auth);
+      setUser(null);
+      router.push('/auth/login');
+    } catch (error: any) {
+      throw new Error(error.message);
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading }}>
+    <AuthContext.Provider value={{ user, loading, login, signOut }}>
       {children}
     </AuthContext.Provider>
   );
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
 } 
