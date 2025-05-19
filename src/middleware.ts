@@ -1,20 +1,19 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { auth } from './lib/firebase/config';
 
 export async function middleware(request: NextRequest) {
-  const session = request.cookies.get('session');
+  const authToken = request.cookies.get('auth-token');
 
   // Korumalı rotalar
   if (request.nextUrl.pathname.startsWith('/dashboard')) {
-    if (!session) {
+    if (!authToken) {
       return NextResponse.redirect(new URL('/auth/login', request.url));
     }
   }
 
   // Auth sayfaları
   if (request.nextUrl.pathname.startsWith('/auth')) {
-    if (session) {
+    if (authToken) {
       return NextResponse.redirect(new URL('/dashboard', request.url));
     }
   }
