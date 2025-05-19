@@ -54,8 +54,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const userData = await UserService.get(userCredential.user.uid);
       setUser(userData);
-      router.push('/dashboard');
+      
+      // Yönlendirme öncesi kısa bir gecikme ekleyelim
+      setTimeout(() => {
+        router.push('/dashboard');
+        router.refresh(); // Sayfayı yenile
+      }, 100);
     } catch (error: any) {
+      console.error('Login error:', error);
       throw new Error(error.message);
     }
   };
@@ -65,7 +71,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await firebaseSignOut(auth);
       setUser(null);
       router.push('/auth/login');
+      router.refresh(); // Sayfayı yenile
     } catch (error: any) {
+      console.error('Signout error:', error);
       throw new Error(error.message);
     }
   };
