@@ -31,15 +31,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
+      console.log('Auth state changed:', firebaseUser?.uid);
       if (firebaseUser) {
-        // Firebase kullanıcısından bizim User tipimize dönüştür
-        const userData = await UserService.get(firebaseUser.uid);
-        setUser(userData);
-        
-        // Token'ı cookie'ye kaydet
-        const token = await firebaseUser.getIdToken();
-        Cookies.set('auth-token', token, { expires: 7 }); // 7 gün geçerli
+        try {
+          // Firebase kullanıcısından bizim User tipimize dönüştür
+          const userData = await UserService.get(firebaseUser.uid);
+          console.log('User data fetched:', userData);
+          setUser(userData);
+          
+          // Token'ı cookie'ye kaydet
+          const token = await firebaseUser.getIdToken();
+          Cookies.set('auth-token', token, { expires: 7 }); // 7 gün geçerli
+        } catch (error) {
+          console.error('Error fetching user data:', error);
+        }
       } else {
+        console.log('No user found, clearing state');
         setUser(null);
         Cookies.remove('auth-token');
       }
@@ -50,16 +57,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
+    console.log('Login attempt started');
     try {
+      console.log('Attempting Firebase sign in');
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      console.log('Firebase sign in successful:', userCredential.user.uid);
+
+      console.log('Fetching user data');
       const userData = await UserService.get(userCredential.user.uid);
-      setUser(userData);
+      console.log('User data fetched:', userData);
       
-      // Yönlendirme öncesi kısa bir gecikme ekleyelim
-      setTimeout(() => {
-        router.push('/dashboard');
-        router.refresh(); // Sayfayı yenile
-      }, 100);
+      setUser(userData);
+      console.log('User state updated');
+
+      // Yönlendirme işlemini değiştiriyoruz
+      console.log('Attempting navigation to dashboard');
+      window.location.href = '/dashboard';
     } catch (error: any) {
       console.error('Login error:', error);
       throw new Error(error.message);
@@ -67,11 +80,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
+    console.log('Sign out started');
     try {
       await firebaseSignOut(auth);
       setUser(null);
-      router.push('/auth/login');
-      router.refresh(); // Sayfayı yenile
+      console.log('Sign out successful, redirecting to login');
+      window.location.href = '/auth/login';
     } catch (error: any) {
       console.error('Signout error:', error);
       throw new Error(error.message);
